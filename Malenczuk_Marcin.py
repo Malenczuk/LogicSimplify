@@ -91,6 +91,7 @@ class RPN:
     def evaluate(self, postfix, values):
         postfix = self.map_variables(postfix, values)
         stack = []
+        was_nand = False
         for i in postfix:
             if not self.is_operator(i):
                 stack.append(i)
@@ -104,11 +105,17 @@ class RPN:
                 elif i == "~":
                     stack.append(not stack.pop())
                 elif i == ">":
-                    stack.append(stack.pop() or not stack.pop())
+                    stack.append(stack.pop() or (not stack.pop()))
                 elif i == "/":
-                    stack.append(not (stack.pop() & stack.pop()))
-
-        return stack.pop()
+                    if was_nand:
+                        stack.append(not (stack.pop() & (not stack.pop())))
+                    else:
+                        stack.append(not (stack.pop() & stack.pop()))
+                        was_nand = True
+                if i != "/":
+                    was_nand = False
+        p = stack.pop()
+        return p
 
     def generate_binaries(self, n):
         for i in range(2 ** n):
@@ -122,6 +129,106 @@ class RPN:
             else:
                 return "F"
         return set([val for val in self.generate_binaries(variable_count) if self.evaluate(postfix, val)])
+
+    def construct_tree(self, postfix):
+        stack = []
+
+        for char in postfix:
+
+            if not self.is_operator(char):
+                stack.append(char)
+            else:
+                if char == '~':
+                    t = (char, stack.pop())
+                else:
+                    right = stack.pop()
+                    left = stack.pop()
+                    if right[0] == char and char not in ">":
+                        right = right[1]
+                    else:
+                        right = [right]
+                    if left[0] == char:
+                        left = left[1]
+                    else:
+                        left = [left]
+                    t = (char, left + right)
+                stack.append(t)
+
+        t = stack.pop()
+        return t
+
+    def minimize_representation(self, expr):
+        if type(expr) is not tuple:
+            return expr
+        if expr[0] == '~':
+            ne = (expr[0], self.minimize_representation(expr[1]))
+        else:
+            ne = (expr[0], [self.minimize_representation(e) for e in expr[1]])
+        done = False
+        while not done:
+            expr = ne
+            ne = self.find_sheffer_stroke(ne)
+            ne = self.find_implications(ne)
+            if expr == ne:
+                done = True
+
+        return expr
+
+    def find_sheffer_stroke(self, expr):
+        if type(expr) is not tuple:
+            return expr
+        if expr[0] == '~':
+            if expr[1][0] == '&':
+                expr = ('/', expr[1][1])
+        return expr
+
+    def find_implications(self, expr):
+        if type(expr) is not tuple:
+            return expr
+        if expr[0] == '|':
+            done = False
+            while not done:
+                done = True
+                for i1, e1 in enumerate(expr[1]):
+                    if e1[0] == '~':
+                        for i2, e2 in enumerate(expr[1]):
+                            if i1 != i2:
+                                expr[1][i1] = ('>', [e1[1][0], e2])
+                                del expr[1][i2]
+                                done = False
+                                break
+                    if not done:
+                        break
+            if len(expr[1]) == 1:
+                expr = expr[1][0]
+        return expr
+
+    def tree_to_rpn(self, expr):
+        if type(expr) is not tuple:
+            return [expr]
+        result = [expr[0]]
+
+        for i, e in enumerate(reversed(expr[1])):
+            result += self.tree_to_rpn(e)
+            if i < len(expr[1]) - 3:
+                result.append(expr[0])
+
+        return list(reversed(result))
+
+    def tree_to_logic(self, expr, prec):
+        if type(expr) is not tuple:
+            return expr
+        if expr[0] == '~':
+            if type(expr[1]) is tuple:
+                result = '~(' + self.tree_to_logic(expr[1]) + ')'
+            else:
+                result = '~' + expr[1]
+        else:
+            result = [self.tree_to_logic(e, self.get_precedence(expr[0])) for e in expr[1]]
+            result = expr[0].join(result)
+            if prec >= self.get_precedence(expr[0]):
+                result = '(' + result + ')'
+        return result
 
 
 class QuineMcCluskey:
@@ -144,9 +251,11 @@ class QuineMcCluskey:
         essential_implicants = self.__find_essential(prime_implicants)
         if essential_implicants == {'-' * self.n_bits}:
             return essential_implicants
-        unate_implicants = self.unate_cover(prime_implicants, minterms)
-
-        return unate_implicants
+        if not self.use_xor:
+            unate_implicants = self.unate_cover(prime_implicants, minterms)
+            return unate_implicants
+        else:
+            return essential_implicants
 
     def __reduce_xor(self, term1, term2):
         reduced = dict()
@@ -328,7 +437,7 @@ class QuineMcCluskey:
             chart.append(column)
         covers = []
         if len(chart) > 0:
-            covers = [set([i]) for i in chart[0]]
+            covers = [{i} for i in chart[0]]
         for i in range(1, len(chart)):
             new_covers = []
             for cover in covers:
@@ -364,6 +473,7 @@ def main():
     rpn = RPN()
 
     postfix = rpn.convert_to_rpn(expr)
+
     if postfix == "ERROR":
         print("ERROR")
         return
@@ -377,14 +487,19 @@ def main():
         terms = qmc.simplify(truth_table)
         qmc.use_xor = True
         x_terms = qmc.simplify(truth_table)
-        terms_log = qmc.convert_to_logic(terms, rpn.get_expression_variables(postfix))
-        x_terms_log = qmc.convert_to_logic(x_terms, rpn.get_expression_variables(postfix))
+        terms_log = rpn.tree_to_logic(rpn.minimize_representation(
+            rpn.construct_tree(rpn.convert_to_rpn(qmc.convert_to_logic(terms, rpn.get_expression_variables(postfix))))),
+                                      0)
+        x_terms_log = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(
+            rpn.convert_to_rpn(qmc.convert_to_logic(x_terms, rpn.get_expression_variables(postfix))))), 0)
+        expr = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(postfix)), 0)
+
         if len(expr) < len(x_terms_log) and len(expr) < len(terms_log):
             print(expr)
         if len(x_terms_log) <= len(terms_log):
-            print(x_terms)
             print(x_terms_log)
         else:
-            print(terms)
             print(terms_log)
+
+
 main()
