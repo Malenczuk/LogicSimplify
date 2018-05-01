@@ -1,5 +1,6 @@
 import string
 import itertools
+from functools import reduce
 
 
 class RPN:
@@ -167,6 +168,16 @@ class RPN:
                 return "F"
         return set([val for val in self.generate_binaries(variable_count) if self.evaluate(postfix, val)])
 
+    def check_expressions_equality(self, expr1, expr2):
+        """
+        :param expr1: first logic expression
+        :param expr2: second logic expression
+        :return: True if two logic function are equal
+        """
+        tt1 = self.generate_truth_table(self.convert_to_rpn(expr1))
+        tt2 = self.generate_truth_table(self.convert_to_rpn(expr2))
+        return tt1 == tt2
+
     def construct_tree(self, postfix):
         """
         :param postfix: logic expression in reversed polish notation
@@ -245,11 +256,18 @@ class RPN:
                 for i1, e1 in enumerate(expr[1]):
                     if e1[0] == '~':
                         for i2, e2 in enumerate(expr[1]):
-                            if i1 != i2:
+                            if i1 != i2 and e2[0] != '~':
                                 expr[1][i1] = ('>', [e1[1][0], e2])
                                 del expr[1][i2]
                                 done = False
                                 break
+                        if done:
+                            for i2, e2 in enumerate(expr[1]):
+                                if i1 != i2:
+                                    expr[1][i1] = ('>', [e1[1][0], e2])
+                                    del expr[1][i2]
+                                    done = False
+                                    break
                     if not done:
                         break
             if len(expr[1]) == 1:
@@ -572,37 +590,39 @@ class QuineMcCluskey:
 
 
 def main():
-    expr = input("Enter logic expression: ").replace(" ", "")
+    input_expression = input("Enter logic expression: ").replace(" ", "")
 
     rpn = RPN()
 
-    postfix = rpn.convert_to_rpn(expr)
+    input_postfix = rpn.convert_to_rpn(input_expression)
 
-    if postfix == "ERROR":
+    if input_postfix == "ERROR":
         print("ERROR")
         return
 
-    truth_table = rpn.generate_truth_table(postfix)
+    truth_table = rpn.generate_truth_table(input_postfix)
 
     if truth_table in ['T', 'F']:
         print(truth_table)
     else:
+        input_min_logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(input_postfix)), 0)
+
         qmc = QuineMcCluskey(False)
         terms = qmc.simplify(truth_table)
+        logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
+            qmc.convert_to_logic(terms, rpn.get_expression_variables(input_postfix))))), 0)
+
         qmc.use_xor = True
-        x_terms = qmc.simplify(truth_table)
-        terms_log = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
-            qmc.convert_to_logic(terms, rpn.get_expression_variables(postfix))))), 0)
-        x_terms_log = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
-            qmc.convert_to_logic(x_terms, rpn.get_expression_variables(postfix))))), 0)
-        expr = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(postfix)), 0)
+        xor_xnor_terms = qmc.simplify(truth_table)
+        xor_xnor_logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
+            qmc.convert_to_logic(xor_xnor_terms, rpn.get_expression_variables(input_postfix))))), 0)
 
-        if len(expr) < len(x_terms_log) and len(expr) < len(terms_log):
-            print(expr)
-        if len(x_terms_log) <= len(terms_log):
-            print(x_terms_log)
-        else:
-            print(terms_log)
+        shortest_logic = list(filter(lambda x: rpn.check_expressions_equality(x, input_expression),
+                        [xor_xnor_logic, logic, input_min_logic]))
+        shortest_logic = reduce((lambda x, y: x if len(x) < len(y) else y), shortest_logic, input_expression)
+
+        print(shortest_logic)
 
 
-main()
+if __name__ == "__main__":
+    main()
