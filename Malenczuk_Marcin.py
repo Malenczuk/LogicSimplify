@@ -7,21 +7,37 @@ class RPN:
     variables = string.ascii_lowercase + "TF"
 
     def is_operator(self, c):
+        """
+        :param c: string
+        :return: True if sting is a operator
+        """
         return c in self.operators
 
     def get_precedence(self, c):
+        """
+        :param c: operator
+        :return: precedence of given operator
+        """
         if self.is_operator(c):
             return self.operators[c]
         else:
             return 0
 
     def is_binary(self, c):
+        """
+        :param c: operator
+        :return: True if binary operator or False if  unary operator
+        """
         if c in ['>', '&', '|', '/', '^']:
             return True
         if c in ['~']:
             return False
 
     def convert_to_rpn(self, infix):
+        """
+        :param infix: logic expression in infix form
+        :return: logic expression in reversed polish notation
+        """
         infix = infix.replace(" ", "")
         if not self.validate_expression(infix):
             return "ERROR"
@@ -50,9 +66,12 @@ class RPN:
         return (postfix)
 
     def validate_expression(self, infix):
-        """sprawdza poprawność syntaktyczną wyrażenia"""
-        state = True  # True - oczekiwany nawias ( lub zmienna, False - oczekiwany nawias ) lub operator
-        par_count = 0  # licznik nawiasów
+        """
+        :param infix: logic expression in infix representation
+        :return: True or False depending on expression being valid
+        """
+        state = True  # True - expecting bracket ( or variable, False - expecting bracket ) or operator
+        par_count = 0  # bracket counter
         for char in infix:
             if char == " ":
                 continue
@@ -73,12 +92,17 @@ class RPN:
                 else:
                     return False
             if par_count < 0: return False
-        return par_count == 0 and not state  # poprawne wyrażenie musi kończyć sie stanem False i mieć zamknięte wszystkie nawiasy
+        return par_count == 0 and not state  # valid expression must end with state False and have closed all brackets
 
     def get_expression_variables(self, expr):
         return ''.join(sorted(set([char for char in expr if ord(char) in range(ord("a"), ord("z"))])))
 
     def map_variables(self, expr, values):
+        """
+        :param expr: logic expression
+        :param values: values of every variable
+        :return: logic expression with mapped values in place of variables
+        """
         variables = "TF" + self.get_expression_variables(expr)
         values = "10" + values
         mapped = list(expr)
@@ -89,6 +113,11 @@ class RPN:
         return mapped
 
     def evaluate(self, postfix, values):
+        """
+        :param postfix: logic expression in reversed polish notation
+        :param values: entry values for exery variable
+        :return: evaluated exrpession to True of False
+        """
         postfix = self.map_variables(postfix, values)
         stack = []
         was_nand = False
@@ -118,10 +147,18 @@ class RPN:
         return p
 
     def generate_binaries(self, n):
+        """
+        :param n: number of bites
+        :return: list of all possible binaries of given lentght
+        """
         for i in range(2 ** n):
             yield bin(i)[2:].rjust(n, '0')
 
     def generate_truth_table(self, postfix):
+        """
+        :param postfix: logic expression in reversed polish notation
+        :return: all binaries that give true for given logic
+        """
         variable_count = len(self.get_expression_variables(postfix))
         if variable_count == 0:
             if self.evaluate(postfix, ""):
@@ -131,6 +168,10 @@ class RPN:
         return set([val for val in self.generate_binaries(variable_count) if self.evaluate(postfix, val)])
 
     def construct_tree(self, postfix):
+        """
+        :param postfix: logic expression in reversed polish notation
+        :return: tree representation of given logic
+        """
         stack = []
 
         for char in postfix:
@@ -158,6 +199,10 @@ class RPN:
         return t
 
     def minimize_representation(self, expr):
+        """
+        :param expr: logic expression to minimize it's representation
+        :return: minimized logic expression
+        """
         if type(expr) is not tuple:
             return expr
         if expr[0] == '~':
@@ -175,6 +220,10 @@ class RPN:
         return expr
 
     def find_sheffer_stroke(self, expr):
+        """
+        :param expr: logic expression
+        :return: logix expression with found nand
+        """
         if type(expr) is not tuple:
             return expr
         if expr[0] == '~':
@@ -183,6 +232,10 @@ class RPN:
         return expr
 
     def find_implications(self, expr):
+        """
+        :param expr: logic expression
+        :return: logic expression with found implications
+        """
         if type(expr) is not tuple:
             return expr
         if expr[0] == '|':
@@ -204,6 +257,10 @@ class RPN:
         return expr
 
     def tree_to_rpn(self, expr):
+        """
+        :param expr: logic expression in form (operator, [expressions])
+        :return: reversed polish notation representation of given logic
+        """
         if type(expr) is not tuple:
             return [expr]
         result = [expr[0]]
@@ -216,6 +273,11 @@ class RPN:
         return list(reversed(result))
 
     def tree_to_logic(self, expr, prec):
+        """
+        :param expr: expression in form (operator, [expressions])
+        :param prec: precedens of higher expression
+        :return: string representation of given logic expression
+        """
         if type(expr) is not tuple:
             return expr
         if expr[0] == '~':
@@ -234,30 +296,44 @@ class RPN:
 class QuineMcCluskey:
 
     def __init__(self, use_xor=False):
-        self.use_xor = use_xor  # Whether or not to use XOR and XNOR operations.
-        self.n_bits = 0  # number of bits (i.e. self.n_bits == len(ones[i]) for every i).
+        self.use_xor = use_xor  # Whether or not to use XOR and XNOR operations
+        self.n_bits = 0  # number of bits
 
     def simplify(self, minterms):
+        """
+        :param minterms: set of binaries for logic expression evaluating to True
+        :return: set of logic expression for given minterms
+        """
+
         if len(minterms) == 0:
             return None
 
+        # setting number of bits
         self.n_bits = max(len(i) for i in minterms)
         if self.n_bits != min(len(i) for i in minterms):
             return None
 
+        # dict of bianries and set of binaries they originated from
         terms = dict([(t, {t}) for t in minterms])
 
+        # Finding all prime implicants of the function
         prime_implicants = self.__find_prime(terms)
-        essential_implicants = self.__find_essential(prime_implicants)
-        if essential_implicants == {'-' * self.n_bits}:
-            return essential_implicants
+
         if not self.use_xor:
+            # find the essential prime implicants of the function using Petrick's method
             unate_implicants = self.unate_cover(prime_implicants, minterms)
             return unate_implicants
         else:
+            # find the essential prime implicants of the function
+            essential_implicants = self.__find_essential(prime_implicants)
             return essential_implicants
 
     def __reduce_xor(self, term1, term2):
+        """
+        :param term1:
+        :param term2:
+        :return: xored term1 and term2
+        """
         reduced = dict()
         differences = [0, 0]
         new_term = []
@@ -274,6 +350,11 @@ class QuineMcCluskey:
         return reduced
 
     def __reduce_xnor(self, term1, term2):
+        """
+        :param term1:
+        :param term2:
+        :return: xnored term1 and term2
+        """
         reduced = dict()
         differences = [0, 0]
         new_term = []
@@ -290,6 +371,10 @@ class QuineMcCluskey:
         return reduced
 
     def __find_xor_and_xnor(self, terms):
+        """
+        :param terms: terms of logic function
+        :return: terms with xor and xnor
+        """
         n_groups = self.n_bits + 1
         groups = [dict() for i in itertools.repeat(None, n_groups)]
         for t in terms.items():
@@ -302,6 +387,10 @@ class QuineMcCluskey:
         return terms
 
     def __find_prime(self, terms):
+        """
+        :param terms: terms of logic function
+        :return: prime implicants of logic function
+        """
 
         marked = dict()
 
@@ -366,6 +455,10 @@ class QuineMcCluskey:
         return marked
 
     def __find_essential(self, terms):
+        """
+        :param terms: prime implicants of logic function
+        :return: essential implicants of loogic function
+        """
         essential_iplicants_range = set()
         essential_iplicants = dict()
 
@@ -399,6 +492,11 @@ class QuineMcCluskey:
         return 4 * len(term[1]) + n
 
     def convert_to_logic(self, terms, expr_vars):
+        """
+        :param terms: essential implicants of logic funtion
+        :param expr_vars: variables of logic funtion
+        :return: string form of logic funtion
+        """
         results = []
         n_terms = len(terms)
         for t in terms:
@@ -428,6 +526,12 @@ class QuineMcCluskey:
         return '|'.join(results)
 
     def unate_cover(self, primes, ones):
+        """
+        Petrick's method for finding essential implicants oof given logic funtion
+        :param primes: prime implicants of logic funtion
+        :param ones: all binaries of logic function
+        :return: essential implicants of logic function
+        """
         chart = []
         for one in ones:
             column = []
@@ -487,11 +591,10 @@ def main():
         terms = qmc.simplify(truth_table)
         qmc.use_xor = True
         x_terms = qmc.simplify(truth_table)
-        terms_log = rpn.tree_to_logic(rpn.minimize_representation(
-            rpn.construct_tree(rpn.convert_to_rpn(qmc.convert_to_logic(terms, rpn.get_expression_variables(postfix))))),
-                                      0)
-        x_terms_log = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(
-            rpn.convert_to_rpn(qmc.convert_to_logic(x_terms, rpn.get_expression_variables(postfix))))), 0)
+        terms_log = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
+            qmc.convert_to_logic(terms, rpn.get_expression_variables(postfix))))), 0)
+        x_terms_log = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
+            qmc.convert_to_logic(x_terms, rpn.get_expression_variables(postfix))))), 0)
         expr = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(postfix)), 0)
 
         if len(expr) < len(x_terms_log) and len(expr) < len(terms_log):
