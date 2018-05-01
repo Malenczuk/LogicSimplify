@@ -301,10 +301,7 @@ class RPN:
         if type(expr) is not tuple:
             return expr
         if expr[0] == '~':
-            if type(expr[1]) is tuple:
-                result = '~(' + self.tree_to_logic(expr[1]) + ')'
-            else:
-                result = '~' + expr[1]
+            result = '~' + self.tree_to_logic(expr[1], 4)
         else:
             result = [self.tree_to_logic(e, self.get_precedence(expr[0])) for e in expr[1]]
             result = expr[0].join(result)
