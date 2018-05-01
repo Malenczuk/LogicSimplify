@@ -216,17 +216,19 @@ class RPN:
         """
         if type(expr) is not tuple:
             return expr
-        if expr[0] == '~':
-            ne = (expr[0], self.minimize_representation(expr[1]))
-        else:
-            ne = (expr[0], [self.minimize_representation(e) for e in expr[1]])
+
         done = False
         while not done:
-            expr = ne
-            ne = self.find_sheffer_stroke(ne)
-            ne = self.find_implications(ne)
-            if expr == ne:
+            old_expr = expr
+            expr = self.find_implications(expr)
+            expr = self.find_sheffer_stroke(expr)
+            if expr == old_expr:
                 done = True
+
+        if expr[0] == '~':
+            expr = (expr[0], self.minimize_representation(expr[1]))
+        else:
+            expr = (expr[0], [self.minimize_representation(e) for e in expr[1]])
 
         return expr
 
@@ -257,14 +259,14 @@ class RPN:
                     if e1[0] == '~':
                         for i2, e2 in enumerate(expr[1]):
                             if i1 != i2 and e2[0] != '~':
-                                expr[1][i1] = ('>', [e1[1][0], e2])
+                                expr[1][i1] = ('>', [e1[1], e2])
                                 del expr[1][i2]
                                 done = False
                                 break
                         if done:
                             for i2, e2 in enumerate(expr[1]):
                                 if i1 != i2:
-                                    expr[1][i1] = ('>', [e1[1][0], e2])
+                                    expr[1][i1] = ('>', [e1[1], e2])
                                     del expr[1][i2]
                                     done = False
                                     break
@@ -290,10 +292,10 @@ class RPN:
 
         return list(reversed(result))
 
-    def tree_to_logic(self, expr, prec):
+    def tree_to_logic(self, expr, precedence):
         """
         :param expr: expression in form (operator, [expressions])
-        :param prec: precedens of higher expression
+        :param precedence: precedence of higher expression
         :return: string representation of given logic expression
         """
         if type(expr) is not tuple:
@@ -306,7 +308,7 @@ class RPN:
         else:
             result = [self.tree_to_logic(e, self.get_precedence(expr[0])) for e in expr[1]]
             result = expr[0].join(result)
-            if prec >= self.get_precedence(expr[0]):
+            if precedence >= self.get_precedence(expr[0]):
                 result = '(' + result + ')'
         return result
 
