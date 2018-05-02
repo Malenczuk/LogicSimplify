@@ -129,7 +129,6 @@ class RPN:
                 if var_cout == 2:
                     was_nand = False
             else:
-                var_cout = 0
                 if i == "&":
                     stack.append(stack.pop() & stack.pop())
                 elif i == "|":
@@ -148,6 +147,7 @@ class RPN:
                         was_nand = True
                 if i != "/":
                     was_nand = False
+                var_cout = 0
         p = stack.pop()
         return p
 
@@ -238,7 +238,6 @@ class RPN:
             expr = (expr[0], self.minimize_representation(expr[1]))
         else:
             expr = (expr[0], [self.minimize_representation(e) for e in expr[1]])
-
         done = False
         while not done:
             old_expr = expr
@@ -259,6 +258,13 @@ class RPN:
         if expr[0] == '~':
             if expr[1][0] == '&':
                 expr = ('/', expr[1][1])
+        elif expr[0] == '|':
+            n = [e[1] for e in expr[1] if e[0] == '~']
+            nn = [e for e in expr[1] if e[0] != '~']
+            if len(n) > 1:
+                expr = ('|', [('/', n)] + nn)
+            if len(expr[1]) == 1:
+                expr = expr[1][0]
         return expr
 
     def __find_implications(self, expr):
@@ -617,8 +623,7 @@ def main():
         return
 
     truth_table = rpn.generate_truth_table(input_postfix)
-    print(input_postfix)
-    print(truth_table)
+
     if truth_table in ['T', 'F']:
         print(truth_table)
     else:
