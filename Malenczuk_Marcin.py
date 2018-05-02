@@ -1,11 +1,10 @@
-import string
-import itertools
+from string import ascii_lowercase
 from functools import reduce
 
 
 class RPN:
     operators = {'>': 1, '&': 2, '|': 2, '/': 2, '^': 3, '~': 4}
-    variables = string.ascii_lowercase + "TF"
+    variables = ascii_lowercase + "TF"
 
     def __is_operator(self, c):
         """
@@ -434,7 +433,7 @@ class QuineMcCluskey:
         :return: terms with xor and xnor
         """
         n_groups = self.n_bits + 1
-        groups = [dict() for i in itertools.repeat(None, n_groups)]
+        groups = [dict() for i in range(n_groups)]
         for t in terms.items():
             groups[t[0].count('1')].update(dict([t]))
         for i, group in enumerate(groups):
