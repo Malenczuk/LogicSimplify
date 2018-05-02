@@ -99,8 +99,4 @@ ENV/
 
 # mypy
 .mypy_cache/
-.idea/LogicSimplify.iml
-.idea/inspectionProfiles/
-.idea/misc.xml
-.idea/modules.xml
-.idea/workspace.xml
+.idea/*
