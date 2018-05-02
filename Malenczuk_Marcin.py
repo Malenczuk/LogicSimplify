@@ -121,10 +121,15 @@ class RPN:
         postfix = self.__map_variables(postfix, values)
         stack = []
         was_nand = False
+        var_cout = 0
         for i in postfix:
             if not self.__is_operator(i):
                 stack.append(i)
+                var_cout += 1
+                if var_cout == 2:
+                    was_nand = False
             else:
+                var_cout = 0
                 if i == "&":
                     stack.append(stack.pop() & stack.pop())
                 elif i == "|":
@@ -136,7 +141,7 @@ class RPN:
                 elif i == ">":
                     stack.append(stack.pop() or (not stack.pop()))
                 elif i == "/":
-                    if was_nand:
+                    if was_nand and var_cout == 1:
                         stack.append(not (stack.pop() & (not stack.pop())))
                     else:
                         stack.append(not (stack.pop() & stack.pop()))
@@ -162,10 +167,16 @@ class RPN:
         variable_count = len(self.get_expression_variables(postfix))
         if variable_count == 0:
             if self.evaluate(postfix, ""):
-                return "T"
+                truth_table = "T"
             else:
-                return "F"
-        return set([val for val in self.__generate_binaries(variable_count) if self.evaluate(postfix, val)])
+                truth_table = "F"
+        else:
+            truth_table = set([val for val in self.__generate_binaries(variable_count) if self.evaluate(postfix, val)])
+            if truth_table == set():
+                truth_table = "F"
+            if truth_table == set(self.__generate_binaries(variable_count)):
+                truth_table = "T"
+        return truth_table
 
     def check_expressions_equality(self, postfix1, postfix2):
         """
@@ -606,7 +617,8 @@ def main():
         return
 
     truth_table = rpn.generate_truth_table(input_postfix)
-
+    print(input_postfix)
+    print(truth_table)
     if truth_table in ['T', 'F']:
         print(truth_table)
     else:
@@ -615,17 +627,15 @@ def main():
         input_min_logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(input_postfix)), 0)
 
         qmc = QuineMcCluskey(False)
-        terms = qmc.simplify(truth_table)
-        logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
-            qmc.convert_to_logic(terms, input_vars)))), 0)
+        logic = qmc.convert_to_logic(qmc.simplify(truth_table), input_vars)
+        min_logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(logic))), 0)
 
         qmc.use_xor = True
-        xor_xnor_terms = qmc.simplify(truth_table)
-        xor_xnor_logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
-            qmc.convert_to_logic(xor_xnor_terms, input_vars)))), 0)
+        xor_xnor_logic =  qmc.convert_to_logic(qmc.simplify(truth_table), input_vars)
+        min_xor_xnor_logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(xor_xnor_logic))), 0)
 
         shortest_logic = filter(lambda x: rpn.check_expressions_equality(rpn.convert_to_rpn(x), input_postfix) == 1,
-                                [xor_xnor_logic, logic, input_min_logic])
+                                [xor_xnor_logic, min_xor_xnor_logic, logic, min_logic, input_min_logic])
         shortest_logic = reduce((lambda x, y: x if len(x) < len(y) else y), list(shortest_logic), input_expression)
 
         print(shortest_logic)
