@@ -7,24 +7,24 @@ class RPN:
     operators = {'>': 1, '&': 2, '|': 2, '/': 2, '^': 3, '~': 4}
     variables = string.ascii_lowercase + "TF"
 
-    def is_operator(self, c):
+    def __is_operator(self, c):
         """
         :param c: string
         :return: True if sting is a operator
         """
         return c in self.operators
 
-    def get_precedence(self, c):
+    def __get_precedence(self, c):
         """
         :param c: operator
         :return: precedence of given operator
         """
-        if self.is_operator(c):
+        if self.__is_operator(c):
             return self.operators[c]
         else:
             return 0
 
-    def is_binary(self, c):
+    def __is_binary(self, c):
         """
         :param c: operator
         :return: True if binary operator or False if  unary operator
@@ -46,10 +46,10 @@ class RPN:
         stack = []
 
         for i in infix:
-            if self.is_operator(i):
+            if self.__is_operator(i):
                 while (len(stack) != 0 and ((
-                        self.is_binary(i) and (self.get_precedence(i) <= self.get_precedence(stack[-1])) or (
-                        not self.is_binary(i) and (self.get_precedence(i) < self.get_precedence(stack[-1])))))):
+                        self.__is_binary(i) and (self.__get_precedence(i) <= self.__get_precedence(stack[-1])) or (
+                        not self.__is_binary(i) and (self.__get_precedence(i) < self.__get_precedence(stack[-1])))))):
                     postfix.append(stack.pop());
                 stack.append(i)
             elif i == "(":
@@ -77,7 +77,7 @@ class RPN:
             if char == " ":
                 continue
             if state:
-                if self.is_operator(char) and not self.is_binary(char):
+                if self.__is_operator(char) and not self.__is_binary(char):
                     continue
                 elif char in self.variables:
                     state = False
@@ -86,7 +86,7 @@ class RPN:
                 else:
                     return False
             else:
-                if self.is_operator(char) and self.is_binary(char):
+                if self.__is_operator(char) and self.__is_binary(char):
                     state = True
                 elif char == ")":
                     par_count -= 1
@@ -98,7 +98,7 @@ class RPN:
     def get_expression_variables(self, expr):
         return ''.join(sorted(set([char for char in expr if ord(char) in range(ord("a"), ord("z"))])))
 
-    def map_variables(self, expr, values):
+    def __map_variables(self, expr, values):
         """
         :param expr: logic expression
         :param values: values of every variable
@@ -119,11 +119,11 @@ class RPN:
         :param values: entry values for exery variable
         :return: evaluated exrpession to True of False
         """
-        postfix = self.map_variables(postfix, values)
+        postfix = self.__map_variables(postfix, values)
         stack = []
         was_nand = False
         for i in postfix:
-            if not self.is_operator(i):
+            if not self.__is_operator(i):
                 stack.append(i)
             else:
                 if i == "&":
@@ -147,7 +147,7 @@ class RPN:
         p = stack.pop()
         return p
 
-    def generate_binaries(self, n):
+    def __generate_binaries(self, n):
         """
         :param n: number of bites
         :return: list of all possible binaries of given lentght
@@ -166,17 +166,24 @@ class RPN:
                 return "T"
             else:
                 return "F"
-        return set([val for val in self.generate_binaries(variable_count) if self.evaluate(postfix, val)])
+        return set([val for val in self.__generate_binaries(variable_count) if self.evaluate(postfix, val)])
 
-    def check_expressions_equality(self, expr1, expr2):
+    def check_expressions_equality(self, postfix1, postfix2):
         """
         :param expr1: first logic expression
         :param expr2: second logic expression
-        :return: True if two logic function are equal
+        :return: 1 if two logic function are equal, -1 if they are negation of one or the other
         """
-        tt1 = self.generate_truth_table(self.convert_to_rpn(expr1))
-        tt2 = self.generate_truth_table(self.convert_to_rpn(expr2))
-        return tt1 == tt2
+        tt1 = self.generate_truth_table(postfix1)
+        tt2 = self.generate_truth_table(postfix2)
+        var1 = self.get_expression_variables(postfix1)
+        var2 = self.get_expression_variables(postfix2)
+        if tt1 == tt2 and var1 == var2:
+            return 1
+        tt2 = self.generate_truth_table(postfix2 + ['~'])
+        if tt1 == tt2 and var1 == var2:
+            return -1
+        return 0
 
     def construct_tree(self, postfix):
         """
@@ -187,7 +194,7 @@ class RPN:
 
         for char in postfix:
 
-            if not self.is_operator(char):
+            if not self.__is_operator(char):
                 stack.append(char)
             else:
                 if char == '~':
@@ -217,22 +224,22 @@ class RPN:
         if type(expr) is not tuple:
             return expr
 
-        done = False
-        while not done:
-            old_expr = expr
-            expr = self.find_implications(expr)
-            expr = self.find_sheffer_stroke(expr)
-            if expr == old_expr:
-                done = True
-
         if expr[0] == '~':
             expr = (expr[0], self.minimize_representation(expr[1]))
         else:
             expr = (expr[0], [self.minimize_representation(e) for e in expr[1]])
 
+        done = False
+        while not done:
+            old_expr = expr
+            expr = self.__find_sheffer_stroke(expr)
+            expr = self.__find_implications(expr)
+            if expr == old_expr:
+                done = True
+
         return expr
 
-    def find_sheffer_stroke(self, expr):
+    def __find_sheffer_stroke(self, expr):
         """
         :param expr: logic expression
         :return: logix expression with found nand
@@ -244,7 +251,7 @@ class RPN:
                 expr = ('/', expr[1][1])
         return expr
 
-    def find_implications(self, expr):
+    def __find_implications(self, expr):
         """
         :param expr: logic expression
         :return: logic expression with found implications
@@ -303,9 +310,9 @@ class RPN:
         if expr[0] == '~':
             result = '~' + self.tree_to_logic(expr[1], 4)
         else:
-            result = [self.tree_to_logic(e, self.get_precedence(expr[0])) for e in expr[1]]
+            result = [self.tree_to_logic(e, self.__get_precedence(expr[0])) for e in expr[1]]
             result = expr[0].join(result)
-            if precedence >= self.get_precedence(expr[0]):
+            if precedence >= self.__get_precedence(expr[0]):
                 result = '(' + result + ')'
         return result
 
@@ -315,6 +322,40 @@ class QuineMcCluskey:
     def __init__(self, use_xor=False):
         self.use_xor = use_xor  # Whether or not to use XOR and XNOR operations
         self.n_bits = 0  # number of bits
+
+    def convert_to_logic(self, terms, expr_vars):
+        """
+        :param terms: essential implicants of logic funtion
+        :param expr_vars: variables of logic funtion
+        :return: string form of logic funtion
+        """
+        results = []
+        n_terms = len(terms)
+        for t in terms:
+            if len(t) == t.count('-'):
+                return 'T'
+            and_result = []
+            xor_result = []
+            xor = t.count('^')
+            xnor = t.count('~')
+            fixed = t.count('1') + t.count('0')
+            brackets = n_terms > 1 and (fixed > 1 or (fixed > 0 and xor + xnor > 0))
+            for i in [ic[0] for ic in enumerate(t) if ic[1] == '1']:
+                and_result.append(expr_vars[i])
+            for i in [ic[0] for ic in enumerate(t) if ic[1] == '0']:
+                and_result.append('~' + expr_vars[i])
+            if xor or xnor:
+                for i in [ic[0] for ic in enumerate(t) if ic[1] in '~^']:
+                    xor_result.append(expr_vars[i])
+                if xnor:
+                    and_result.append('~(' + '^'.join(xor_result) + ')')
+                else:
+                    and_result.append('^'.join(xor_result))
+            if brackets:
+                results.append('(' + '&'.join(and_result) + ')')
+            else:
+                results.append('&'.join(and_result))
+        return '|'.join(results)
 
     def simplify(self, minterms):
         """
@@ -338,7 +379,7 @@ class QuineMcCluskey:
 
         if not self.use_xor:
             # find the essential prime implicants of the function using Petrick's method
-            unate_implicants = self.unate_cover(prime_implicants, minterms)
+            unate_implicants = self.__unate_cover(prime_implicants, minterms)
             return unate_implicants
         else:
             # find the essential prime implicants of the function
@@ -508,41 +549,7 @@ class QuineMcCluskey:
                 n += 1
         return 4 * len(term[1]) + n
 
-    def convert_to_logic(self, terms, expr_vars):
-        """
-        :param terms: essential implicants of logic funtion
-        :param expr_vars: variables of logic funtion
-        :return: string form of logic funtion
-        """
-        results = []
-        n_terms = len(terms)
-        for t in terms:
-            if len(t) == t.count('-'):
-                return 'T'
-            and_result = []
-            xor_result = []
-            xor = t.count('^')
-            xnor = t.count('~')
-            fixed = t.count('1') + t.count('0')
-            brackets = n_terms > 1 and (fixed > 1 or (fixed > 0 and xor + xnor > 0))
-            for i in [ic[0] for ic in enumerate(t) if ic[1] == '1']:
-                and_result.append(expr_vars[i])
-            for i in [ic[0] for ic in enumerate(t) if ic[1] == '0']:
-                and_result.append('~' + expr_vars[i])
-            if xor or xnor:
-                for i in [ic[0] for ic in enumerate(t) if ic[1] in '~^']:
-                    xor_result.append(expr_vars[i])
-                if xnor:
-                    and_result.append('~(' + '^'.join(xor_result) + ')')
-                else:
-                    and_result.append('^'.join(xor_result))
-            if brackets:
-                results.append('(' + '&'.join(and_result) + ')')
-            else:
-                results.append('&'.join(and_result))
-        return '|'.join(results)
-
-    def unate_cover(self, primes, ones):
+    def __unate_cover(self, primes, ones):
         """
         Petrick's method for finding essential implicants oof given logic funtion
         :param primes: prime implicants of logic funtion
@@ -577,14 +584,14 @@ class QuineMcCluskey:
         min_complexity = 99999999
         for cover in covers:
             primes_in_cover = [list(primes.keys())[prime_index] for prime_index in cover]
-            complexity = self.calculate_complexity(primes_in_cover)
+            complexity = self.__calculate_complexity(primes_in_cover)
             if complexity < min_complexity:
                 min_complexity = complexity
                 result = primes_in_cover
 
         return result
 
-    def calculate_complexity(self, primes):
+    def __calculate_complexity(self, primes):
         return len(self.convert_to_logic(primes, 'a' * self.n_bits))
 
 
@@ -604,21 +611,23 @@ def main():
     if truth_table in ['T', 'F']:
         print(truth_table)
     else:
+        input_vars = rpn.get_expression_variables(input_postfix)
+
         input_min_logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(input_postfix)), 0)
 
         qmc = QuineMcCluskey(False)
         terms = qmc.simplify(truth_table)
         logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
-            qmc.convert_to_logic(terms, rpn.get_expression_variables(input_postfix))))), 0)
+            qmc.convert_to_logic(terms, input_vars)))), 0)
 
         qmc.use_xor = True
         xor_xnor_terms = qmc.simplify(truth_table)
         xor_xnor_logic = rpn.tree_to_logic(rpn.minimize_representation(rpn.construct_tree(rpn.convert_to_rpn(
-            qmc.convert_to_logic(xor_xnor_terms, rpn.get_expression_variables(input_postfix))))), 0)
+            qmc.convert_to_logic(xor_xnor_terms, input_vars)))), 0)
 
-        shortest_logic = list(filter(lambda x: rpn.check_expressions_equality(x, input_expression),
-                        [xor_xnor_logic, logic, input_min_logic]))
-        shortest_logic = reduce((lambda x, y: x if len(x) < len(y) else y), shortest_logic, input_expression)
+        shortest_logic = filter(lambda x: rpn.check_expressions_equality(rpn.convert_to_rpn(x), input_postfix) == 1,
+                                [xor_xnor_logic, logic, input_min_logic])
+        shortest_logic = reduce((lambda x, y: x if len(x) < len(y) else y), list(shortest_logic), input_expression)
 
         print(shortest_logic)
 
